@@ -25,12 +25,17 @@ interface StudentWithStats extends Student {
   hasError: boolean;
 }
 
-const StudentRow = ({ student, onStatsUpdate }: { student: Student; onStatsUpdate?: (id: string, totalSolved: number | null) => void }) => {
+const StudentRow = ({ student, onStatsUpdate }: { student: Student; onStatsUpdate?: (id: string, payload: { totalSolved?: number; score?: number } | null) => void }) => {
   const { stats, loading, error } = useLeetCodeStats(student.leetcode_username);
   useEffect(() => {
     if (onStatsUpdate) {
       if (!loading) {
-        onStatsUpdate(student.id, error ? null : (stats ? stats.totalSolved : null));
+        if (error || !stats) {
+          onStatsUpdate(student.id, null);
+        } else {
+          const score = (stats.easySolved ?? 0) + 2 * (stats.mediumSolved ?? 0) + 3 * (stats.hardSolved ?? 0);
+          onStatsUpdate(student.id, { totalSolved: stats.totalSolved, score });
+        }
       }
     }
   }, [loading, error, stats?.totalSolved, onStatsUpdate, student.id]);
@@ -49,6 +54,17 @@ const StudentRow = ({ student, onStatsUpdate }: { student: Student; onStatsUpdat
           <Badge variant="destructive">Error</Badge>
         ) : stats ? (
           <Badge variant="default">{stats.totalSolved}</Badge>
+        ) : (
+          <Badge variant="secondary">N/A</Badge>
+        )}
+      </TableCell>
+      <TableCell>
+        {loading ? (
+          <Badge variant="secondary">Loading...</Badge>
+        ) : error ? (
+          <Badge variant="destructive">Error</Badge>
+        ) : stats ? (
+          <Badge variant="outline">{(stats.easySolved ?? 0) + 2 * (stats.mediumSolved ?? 0) + 3 * (stats.hardSolved ?? 0)}</Badge>
         ) : (
           <Badge variant="secondary">N/A</Badge>
         )}
@@ -77,6 +93,8 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
   const [selectedSection, setSelectedSection] = useState<string>("ALL");
   const [sortByProblems, setSortByProblems] = useState<'none' | 'asc' | 'desc'>("none");
   const [statsById, setStatsById] = useState<Record<string, number | undefined>>({});
+  const [scoresById, setScoresById] = useState<Record<string, number | undefined>>({});
+  const [rollType, setRollType] = useState<'ALL' | 'REGULAR' | 'LE'>("ALL");
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -86,7 +104,7 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
 
   useEffect(() => {
     filterStudents();
-  }, [students, searchTerm, selectedSection, sortByProblems, statsById]);
+  }, [students, searchTerm, selectedSection, rollType, sortByProblems, statsById]);
 
   const fetchStudents = async () => {
     try {
@@ -111,6 +129,30 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
   };
 
   const filterStudents = () => {
+    const rollRanges: Record<string, { REGULAR: Array<[string, string]>; LE: Array<[string, string]> }> = {
+      A: {
+        REGULAR: [["23211A6701", "23211A6764"]],
+        LE: [["24215A6701", "24215A6707"]]
+      },
+      B: {
+        REGULAR: [["23211A6765", "23211A67C7"]],
+        LE: [["24215A6708", "24215A6714"]]
+      }
+    };
+
+    const compareRoll = (a: string, b: string) => (a === b ? 0 : a < b ? -1 : 1);
+    const inRange = (value: string, [start, end]: [string, string]) => compareRoll(value, start) >= 0 && compareRoll(value, end) <= 0;
+    const isRegular = (section: string, roll: string) => {
+      const sec = rollRanges[section as keyof typeof rollRanges];
+      if (!sec) return false;
+      return sec.REGULAR.some((r) => inRange(roll, r));
+    };
+    const isLE = (section: string, roll: string) => {
+      const sec = rollRanges[section as keyof typeof rollRanges];
+      if (!sec) return false;
+      return sec.LE.some((r) => inRange(roll, r));
+    };
+
     const matchesSearch = (student: Student) =>
       student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.roll_number.toLowerCase().includes(searchTerm.toLowerCase());
@@ -118,7 +160,16 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
     const matchesSection = (student: Student) =>
       selectedSection === "ALL" || student.section === selectedSection;
 
-    let filtered = students.filter((student) => matchesSearch(student) && matchesSection(student));
+    const matchesRollType = (student: Student) => {
+      if (rollType === "ALL") return true;
+      // Normalize spaces and case in roll number
+      const roll = student.roll_number.replace(/\s+/g, '').toUpperCase();
+      const section = student.section.toUpperCase();
+      if (rollType === "REGULAR") return isRegular(section, roll);
+      return isLE(section, roll);
+    };
+
+    let filtered = students.filter((student) => matchesSearch(student) && matchesSection(student) && matchesRollType(student));
 
     if (sortByProblems !== "none") {
       filtered = [...filtered].sort((a, b) => {
@@ -126,18 +177,74 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
         const bVal = typeof statsById[b.id] === "number" ? (statsById[b.id] as number) : -1;
         return sortByProblems === "desc" ? bVal - aVal : aVal - bVal;
       });
+    } else {
+      // Default ordering: roll number ascending within the filtered set
+      filtered = [...filtered].sort((a, b) => compareRoll(a.roll_number.replace(/\s+/g, '').toUpperCase(), b.roll_number.replace(/\s+/g, '').toUpperCase()));
     }
 
     setFilteredStudents(filtered);
   };
 
-  const handleStatsUpdate = (id: string, totalSolved: number | null) => {
-    setStatsById((prev) => {
-      const current = prev[id];
-      const nextVal = typeof totalSolved === "number" ? totalSolved : undefined;
-      if (current === nextVal) return prev;
-      return { ...prev, [id]: nextVal };
+  const handleStatsUpdate = (id: string, payload: { totalSolved?: number; score?: number } | null) => {
+    if (!payload) {
+      setStatsById((prev) => ({ ...prev, [id]: undefined }));
+      setScoresById((prev) => ({ ...prev, [id]: undefined }));
+      return;
+    }
+    const { totalSolved, score } = payload;
+    if (typeof totalSolved === "number") {
+      setStatsById((prev) => (prev[id] === totalSolved ? prev : { ...prev, [id]: totalSolved }));
+    }
+    if (typeof score === "number") {
+      setScoresById((prev) => (prev[id] === score ? prev : { ...prev, [id]: score }));
+    }
+  };
+
+  const exportToCSV = () => {
+    const headers = [
+      "Name",
+      "Roll Number",
+      "Branch",
+      "Section",
+      "LeetCode Username",
+      "Problems Solved",
+      "Score"
+    ];
+    const rows = filteredStudents.map((s) => {
+      const solved = typeof statsById[s.id] === "number" ? (statsById[s.id] as number) : "";
+      const score = typeof scoresById[s.id] === "number" ? (scoresById[s.id] as number) : "";
+      return [
+        s.name,
+        s.roll_number,
+        s.branch,
+        s.section,
+        s.leetcode_username,
+        solved,
+        score
+      ];
     });
+
+    const escapeCell = (cell: string | number) => {
+      const value = String(cell ?? "");
+      if (value.includes(",") || value.includes("\n") || value.includes('"')) {
+        return '"' + value.replace(/"/g, '""') + '"';
+      }
+      return value;
+    };
+
+    const csv = [headers, ...rows]
+      .map((row) => row.map(escapeCell).join(","))
+      .join("\n");
+
+    const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "students_leetcode_stats.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleLogout = async () => {
@@ -160,10 +267,13 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">Faculty Dashboard</h1>
-          <Button onClick={handleLogout} variant="outline">
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={exportToCSV} variant="default">Export to Excel (CSV)</Button>
+            <Button onClick={handleLogout} variant="outline">
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          </div>
         </div>
 
         <Card className="mb-6">
@@ -190,12 +300,22 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
                   ))}
                 </SelectContent>
               </Select>
+              {/* <Select value={rollType} onValueChange={(value: 'ALL' | 'REGULAR' | 'LE') => setRollType(value)}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Roll Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Roll Types</SelectItem>
+                  <SelectItem value="REGULAR">Regular</SelectItem>
+                  <SelectItem value="LE">Lateral Entry</SelectItem>
+                </SelectContent>
+              </Select> */}
               <Select value={sortByProblems} onValueChange={(value: 'none' | 'asc' | 'desc') => setSortByProblems(value)}>
                 <SelectTrigger className="w-[220px]">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Default (Name)</SelectItem>
+                  <SelectItem value="none">Default (Roll Number)</SelectItem>
                   <SelectItem value="desc">Problems Solved: High to Low</SelectItem>
                   <SelectItem value="asc">Problems Solved: Low to High</SelectItem>
                 </SelectContent>
@@ -212,6 +332,7 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
                     <TableHead>Section</TableHead>
                     <TableHead>LeetCode Username</TableHead>
                     <TableHead>Problems Solved</TableHead>
+                    <TableHead>Score</TableHead>
                     <TableHead>Breakdown</TableHead>
                   </TableRow>
                 </TableHeader>
