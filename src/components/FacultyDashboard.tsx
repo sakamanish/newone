@@ -25,7 +25,7 @@ interface StudentWithStats extends Student {
   hasError: boolean;
 }
 
-const StudentRow = ({ student, onStatsUpdate }: { student: Student; onStatsUpdate?: (id: string, payload: { totalSolved?: number; score?: number } | null) => void }) => {
+const StudentRow = ({ student, onStatsUpdate }: { student: Student; onStatsUpdate?: (id: string, payload: { totalSolved?: number; score?: number; easySolved?: number; mediumSolved?: number; hardSolved?: number } | null) => void }) => {
   const { stats, loading, error } = useLeetCodeStats(student.leetcode_username);
   useEffect(() => {
     if (onStatsUpdate) {
@@ -34,7 +34,7 @@ const StudentRow = ({ student, onStatsUpdate }: { student: Student; onStatsUpdat
           onStatsUpdate(student.id, null);
         } else {
           const score = (stats.easySolved ?? 0) + 2 * (stats.mediumSolved ?? 0) + 3 * (stats.hardSolved ?? 0);
-          onStatsUpdate(student.id, { totalSolved: stats.totalSolved, score });
+          onStatsUpdate(student.id, { totalSolved: stats.totalSolved, score, easySolved: stats.easySolved ?? 0, mediumSolved: stats.mediumSolved ?? 0, hardSolved: stats.hardSolved ?? 0 });
         }
       }
     }
@@ -94,6 +94,9 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
   const [sortByProblems, setSortByProblems] = useState<'none' | 'asc' | 'desc'>("none");
   const [statsById, setStatsById] = useState<Record<string, number | undefined>>({});
   const [scoresById, setScoresById] = useState<Record<string, number | undefined>>({});
+  const [easyById, setEasyById] = useState<Record<string, number | undefined>>({});
+  const [mediumById, setMediumById] = useState<Record<string, number | undefined>>({});
+  const [hardById, setHardById] = useState<Record<string, number | undefined>>({});
   const [rollType, setRollType] = useState<'ALL' | 'REGULAR' | 'LE'>("ALL");
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -185,18 +188,30 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
     setFilteredStudents(filtered);
   };
 
-  const handleStatsUpdate = (id: string, payload: { totalSolved?: number; score?: number } | null) => {
+  const handleStatsUpdate = (id: string, payload: { totalSolved?: number; score?: number; easySolved?: number; mediumSolved?: number; hardSolved?: number } | null) => {
     if (!payload) {
       setStatsById((prev) => ({ ...prev, [id]: undefined }));
       setScoresById((prev) => ({ ...prev, [id]: undefined }));
+      setEasyById((prev) => ({ ...prev, [id]: undefined }));
+      setMediumById((prev) => ({ ...prev, [id]: undefined }));
+      setHardById((prev) => ({ ...prev, [id]: undefined }));
       return;
     }
-    const { totalSolved, score } = payload;
+    const { totalSolved, score, easySolved, mediumSolved, hardSolved } = payload;
     if (typeof totalSolved === "number") {
       setStatsById((prev) => (prev[id] === totalSolved ? prev : { ...prev, [id]: totalSolved }));
     }
     if (typeof score === "number") {
       setScoresById((prev) => (prev[id] === score ? prev : { ...prev, [id]: score }));
+    }
+    if (typeof easySolved === "number") {
+      setEasyById((prev) => (prev[id] === easySolved ? prev : { ...prev, [id]: easySolved }));
+    }
+    if (typeof mediumSolved === "number") {
+      setMediumById((prev) => (prev[id] === mediumSolved ? prev : { ...prev, [id]: mediumSolved }));
+    }
+    if (typeof hardSolved === "number") {
+      setHardById((prev) => (prev[id] === hardSolved ? prev : { ...prev, [id]: hardSolved }));
     }
   };
 
@@ -208,11 +223,17 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
       "Section",
       "LeetCode Username",
       "Problems Solved",
-      "Score"
+      "Score",
+      "Easy",
+      "Medium",
+      "Hard"
     ];
     const rows = filteredStudents.map((s) => {
       const solved = typeof statsById[s.id] === "number" ? (statsById[s.id] as number) : "";
       const score = typeof scoresById[s.id] === "number" ? (scoresById[s.id] as number) : "";
+      const easy = typeof easyById[s.id] === "number" ? (easyById[s.id] as number) : "";
+      const medium = typeof mediumById[s.id] === "number" ? (mediumById[s.id] as number) : "";
+      const hard = typeof hardById[s.id] === "number" ? (hardById[s.id] as number) : "";
       return [
         s.name,
         s.roll_number,
@@ -220,7 +241,10 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
         s.section,
         s.leetcode_username,
         solved,
-        score
+        score,
+        easy,
+        medium,
+        hard
       ];
     });
 
