@@ -240,7 +240,14 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "students_leetcode_stats.csv";
+    
+    // Generate filename with timestamp and date
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+    const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-'); // HH-MM-SS format
+    const filename = `${dateStr}_${timeStr}.csv`;
+    
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
