@@ -25,7 +25,7 @@ interface StudentWithStats extends Student {
   hasError: boolean;
 }
 
-const StudentRow = ({ student, onStatsUpdate }: { student: Student; onStatsUpdate?: (id: string, payload: { totalSolved?: number; score?: number; easySolved?: number; mediumSolved?: number; hardSolved?: number } | null) => void }) => {
+const StudentRow = ({ student, index, onStatsUpdate }: { student: Student; index: number; onStatsUpdate?: (id: string, payload: { totalSolved?: number; score?: number; easySolved?: number; mediumSolved?: number; hardSolved?: number } | null) => void }) => {
   const { stats, loading, error } = useLeetCodeStats(student.leetcode_username);
   useEffect(() => {
     if (onStatsUpdate) {
@@ -42,6 +42,7 @@ const StudentRow = ({ student, onStatsUpdate }: { student: Student; onStatsUpdat
   
   return (
     <TableRow>
+      <TableCell className="font-medium text-center">{index + 1}</TableCell>
       <TableCell className="font-medium">{student.name}</TableCell>
       <TableCell>{student.roll_number}</TableCell>
       <TableCell>{student.branch}</TableCell>
@@ -217,6 +218,7 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
 
   const exportToCSV = () => {
     const headers = [
+      "Serial Number",
       "Name",
       "Roll Number",
       "Branch",
@@ -228,13 +230,14 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
       "Medium",
       "Hard"
     ];
-    const rows = filteredStudents.map((s) => {
+    const rows = filteredStudents.map((s, index) => {
       const solved = typeof statsById[s.id] === "number" ? (statsById[s.id] as number) : "";
       const score = typeof scoresById[s.id] === "number" ? (scoresById[s.id] as number) : "";
       const easy = typeof easyById[s.id] === "number" ? (easyById[s.id] as number) : "";
       const medium = typeof mediumById[s.id] === "number" ? (mediumById[s.id] as number) : "";
       const hard = typeof hardById[s.id] === "number" ? (hardById[s.id] as number) : "";
       return [
+        index + 1,
         s.name,
         s.roll_number,
         s.branch,
@@ -357,6 +360,7 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Serial Number</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Roll Number</TableHead>
                     <TableHead>Branch</TableHead>
@@ -370,13 +374,13 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
                 <TableBody>
                   {filteredStudents.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         {searchTerm ? "No students found matching your search." : "No students registered yet."}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredStudents.map((student) => (
-                      <StudentRow key={student.id} student={student} onStatsUpdate={handleStatsUpdate} />
+                    filteredStudents.map((student, index) => (
+                      <StudentRow key={student.id} student={student} index={index} onStatsUpdate={handleStatsUpdate} />
                     ))
                   )}
                 </TableBody>
