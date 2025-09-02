@@ -25,7 +25,7 @@ interface StudentWithStats extends Student {
   hasError: boolean;
 }
 
-const StudentRow = ({ student, index, onStatsUpdate }: { student: Student; index: number; onStatsUpdate?: (id: string, payload: { totalSolved?: number; score?: number; easySolved?: number; mediumSolved?: number; hardSolved?: number } | null) => void }) => {
+const StudentRow = ({ student, index, onStatsUpdate }: { student: Student; index: number; onStatsUpdate?: (id: string, payload: { totalSolved?: number; score?: number; easySolved?: number; mediumSolved?: number; hardSolved?: number; submissions?: number } | null) => void }) => {
   const { stats, loading, error } = useLeetCodeStats(student.leetcode_username);
   useEffect(() => {
     if (onStatsUpdate) {
@@ -34,7 +34,7 @@ const StudentRow = ({ student, index, onStatsUpdate }: { student: Student; index
           onStatsUpdate(student.id, null);
         } else {
           const score = (stats.easySolved ?? 0) + 2 * (stats.mediumSolved ?? 0) + 3 * (stats.hardSolved ?? 0);
-          onStatsUpdate(student.id, { totalSolved: stats.totalSolved, score, easySolved: stats.easySolved ?? 0, mediumSolved: stats.mediumSolved ?? 0, hardSolved: stats.hardSolved ?? 0 });
+          onStatsUpdate(student.id, { totalSolved: stats.totalSolved, score, easySolved: stats.easySolved ?? 0, mediumSolved: stats.mediumSolved ?? 0, hardSolved: stats.hardSolved ?? 0, submissions: stats.recentSubmissions7 ?? 0 });
         }
       }
     }
@@ -105,6 +105,8 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
   const [easyById, setEasyById] = useState<Record<string, number | undefined>>({});
   const [mediumById, setMediumById] = useState<Record<string, number | undefined>>({});
   const [hardById, setHardById] = useState<Record<string, number | undefined>>({});
+  const [submissionsById, setSubmissionsById] = useState<Record<string, number | undefined>>({});
+
   const [rollType, setRollType] = useState<'ALL' | 'REGULAR' | 'LE'>("ALL");
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -196,16 +198,17 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
     setFilteredStudents(filtered);
   };
 
-  const handleStatsUpdate = (id: string, payload: { totalSolved?: number; score?: number; easySolved?: number; mediumSolved?: number; hardSolved?: number } | null) => {
+  const handleStatsUpdate = (id: string, payload: { totalSolved?: number; score?: number; easySolved?: number; mediumSolved?: number; hardSolved?: number; submissions?: number } | null) => {
     if (!payload) {
       setStatsById((prev) => ({ ...prev, [id]: undefined }));
       setScoresById((prev) => ({ ...prev, [id]: undefined }));
       setEasyById((prev) => ({ ...prev, [id]: undefined }));
       setMediumById((prev) => ({ ...prev, [id]: undefined }));
       setHardById((prev) => ({ ...prev, [id]: undefined }));
+      setSubmissionsById((prev) => ({ ...prev, [id]: undefined }));
       return;
     }
-    const { totalSolved, score, easySolved, mediumSolved, hardSolved } = payload;
+    const { totalSolved, score, easySolved, mediumSolved, hardSolved, submissions } = payload;
     if (typeof totalSolved === "number") {
       setStatsById((prev) => (prev[id] === totalSolved ? prev : { ...prev, [id]: totalSolved }));
     }
@@ -221,6 +224,9 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
     if (typeof hardSolved === "number") {
       setHardById((prev) => (prev[id] === hardSolved ? prev : { ...prev, [id]: hardSolved }));
     }
+    if (typeof submissions === "number") {
+      setSubmissionsById((prev) => (prev[id] === submissions ? prev : { ...prev, [id]: submissions }));
+    }
   };
 
   const exportToCSV = () => {
@@ -235,7 +241,8 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
       "Score",
       "Easy",
       "Medium",
-      "Hard"
+      "Hard",
+      "Submissions"
     ];
     const rows = filteredStudents.map((s, index) => {
       const solved = typeof statsById[s.id] === "number" ? (statsById[s.id] as number) : "";
@@ -243,6 +250,7 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
       const easy = typeof easyById[s.id] === "number" ? (easyById[s.id] as number) : "";
       const medium = typeof mediumById[s.id] === "number" ? (mediumById[s.id] as number) : "";
       const hard = typeof hardById[s.id] === "number" ? (hardById[s.id] as number) : "";
+      const submissions = typeof submissionsById[s.id] === "number" ? (submissionsById[s.id] as number) : "";
       return [
         index + 1,
         s.name,
@@ -254,7 +262,8 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
         score,
         easy,
         medium,
-        hard
+        hard,
+        submissions
       ];
     });
 
@@ -382,7 +391,8 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
                 <TableBody>
                   {filteredStudents.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+
                         {searchTerm ? "No students found matching your search." : "No students registered yet."}
                       </TableCell>
                     </TableRow>
