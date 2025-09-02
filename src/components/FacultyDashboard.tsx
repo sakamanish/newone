@@ -79,6 +79,13 @@ const StudentRow = ({ student, index, onStatsUpdate }: { student: Student; index
           <div className="text-sm text-muted-foreground">-</div>
         )}
       </TableCell>
+      <TableCell>
+        {stats && !error && !loading ? (
+          <Badge variant="secondary">Last 7d: {stats.recentSubmissions7 ?? 0}</Badge>
+        ) : (
+          <Badge variant="secondary">N/A</Badge>
+        )}
+      </TableCell>
     </TableRow>
   );
 };
@@ -369,6 +376,7 @@ export const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
                     <TableHead>Problems Solved</TableHead>
                     <TableHead>Score</TableHead>
                     <TableHead>Breakdown</TableHead>
+                    <TableHead>Submissions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
