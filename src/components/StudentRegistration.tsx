@@ -19,56 +19,59 @@ export const StudentRegistration = () => {
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
+  e.preventDefault();
+  setIsSubmitting(true);
 
-    try {
-      const { error } = await supabase
-        .from('students')
-        .insert([
-          {
-            name: formData.name,
-            roll_number: formData.rollNumber,
-            branch: formData.branch,
-            section: formData.section,
-            leetcode_username: formData.leetcodeUsername
-          }
-        ]);
+  try {
+    const rollNumberNormalized = formData.rollNumber.toUpperCase(); // 👈 normalize here
 
-      if (error) {
-        if (error.code === '23505') {
-          toast({
-            title: "Error",
-            description: "Roll number already exists. Please use a different roll number.",
-            variant: "destructive"
-          });
-        } else {
-          throw error;
+    const { error } = await supabase
+      .from('students')
+      .insert([
+        {
+          name: formData.name,
+          roll_number: rollNumberNormalized, // 👈 always store uppercase
+          branch: formData.branch,
+          section: formData.section,
+          leetcode_username: formData.leetcodeUsername
         }
-      } else {
+      ]);
+
+    if (error) {
+      if (error.code === '23505') {
         toast({
-          title: "Success",
-          description: "Student registered successfully!"
+          title: "Error",
+          description: "Roll number already exists. Please use a different roll number.",
+          variant: "destructive"
         });
-        setFormData({
-          name: "",
-          rollNumber: "",
-          branch: "",
-          section: "",
-          leetcodeUsername: ""
-        });
+      } else {
+        throw error;
       }
-    } catch (error) {
-      console.error('Error registering student:', error);
+    } else {
       toast({
-        title: "Error",
-        description: "Failed to register student. Please try again.",
-        variant: "destructive"
+        title: "Success",
+        description: "Student registered successfully!"
       });
-    } finally {
-      setIsSubmitting(false);
+      setFormData({
+        name: "",
+        rollNumber: "",
+        branch: "",
+        section: "",
+        leetcodeUsername: ""
+      });
     }
-  };
+  } catch (error) {
+    console.error('Error registering student:', error);
+    toast({
+      title: "Error",
+      description: "Failed to register student. Please try again.",
+      variant: "destructive"
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
   const branches = ["CSD", "CSE", "AI&DS", "AI&ML", "CS&BS", "IT"];
   const sections = ["A", "B", "C", "D"];
